@@ -1,0 +1,4 @@
+build/
+*.bpk
+*.bpk.z
+*.part*
