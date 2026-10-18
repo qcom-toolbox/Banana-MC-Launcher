@@ -216,13 +216,33 @@ int mc_java_guess(const mc_version* v) {
     return 8;
 }
 
+/* the version's libraries have LWJGL 2 (org.lwjgl.lwjgl:...) */
+static int uses_lwjgl2(const jv* json) {
+    jv* libs = jget(json, "libraries");
+    for (int i = 0; i < jlen(libs); i++) {
+        const char* n = jstr(jat(libs, i), "name");
+        if (n && !strncmp(n, "org.lwjgl.lwjgl:", 16)) return 1;
+    }
+    return 0;
+}
+
+/* LWJGL 2 for Banana OS: lwjgl2.jar in the LWJGL folder (ports/lwjgl/lwjgl2,
+ * from java.bpk) - LWJGL 2's classes over LWJGL 3, for 1.7.2 to 1.12.2 */
+static const char* lwjgl2_jar(void) {
+    static char path[400];
+    if (!mc_lwjgl_dir()) return NULL;
+    snprintf(path, sizeof(path), "%s/lwjgl2.jar", mc_lwjgl_dir());
+    return file_size(path) > 0 ? path : NULL;
+}
+
 const char* mc_unsupported(const mc_version* v) {
     static char tag[16];
     int java = mc_java_guess(v);
     if (java > MC_JAVA_MAJOR) { snprintf(tag, sizeof(tag), "Java %d", java); return tag; }
-    /* LWJGL 3 came with 17w43a (1.13's snapshots): before it, LWJGL 2, which
-     * Banana OS has no port of (and up to 1.5.2, a launchwrapper made for Java 8) */
-    if (v->lwjgl2 || strcmp(v->time, "2017-10-25") < 0) return "LWJGL 2";
+    /* 1.6.4 and older start through launchwrapper, which only runs on Java 8;
+     * 1.7.2 to 1.12.2 use LWJGL 2: played through lwjgl2.jar when it is there */
+    if (v->lwjgl2 || strcmp(v->time, "2013-10-25") < 0) return "Java 8";
+    if (strcmp(v->time, "2017-10-25") < 0 && !lwjgl2_jar()) return "LWJGL 2";
     return NULL;
 }
 
@@ -231,11 +251,8 @@ static const char* old_version(const jv* json) {
     const char* main = jstr(json, "mainClass");
     if (main && !strcmp(main, "net.minecraft.launchwrapper.Launch"))
         return "starts through launchwrapper, which only runs on Java 8";
-    jv* libs = jget(json, "libraries");
-    for (int i = 0; i < jlen(libs); i++) {
-        const char* n = jstr(jat(libs, i), "name");
-        if (n && !strncmp(n, "org.lwjgl.lwjgl:", 16)) return "uses LWJGL 2, and Banana OS only has LWJGL 3";
-    }
+    if (uses_lwjgl2(json) && !lwjgl2_jar())
+        return "uses LWJGL 2: install java.bpk from a Banana OS release that has /usr/java/lwjgl/lwjgl2.jar";
     return NULL;
 }
 
@@ -399,6 +416,7 @@ typedef struct {
     size_t cplen, cpcap;
     char   assets_id[64];
     int    assets_virtual, assets_resources;
+    int    lwjgl2;                       /* LWJGL 2: played through lwjgl2.jar (LWJGL 3 underneath) */
     char   log_config[300];
     char   log_arg[200];
 } plan_t;
@@ -500,6 +518,11 @@ static int plan_libraries(plan_t* p, char* err, int ecap) {
         /* native code built for Linux (glibc): no use here - Banana OS's own
          * builds go in ~/.minecraft/natives */
         if (!strncmp(cls, "natives-", 8)) continue;
+        /* LWJGL 2 itself, its natives and jinput: lwjgl2.jar and LWJGL 3
+         * stand in for them (lwjgl_util, plain Java, stays) */
+        if (p->lwjgl2 && (!strncmp(name, "org.lwjgl.lwjgl:lwjgl:", 22) || !strncmp(name, "org.lwjgl.lwjgl:lwjgl-platform:", 31) ||
+                          !strncmp(name, "net.java.jinput:", 16) || !strncmp(name, "net.java.jutils:", 16)))
+            continue;
         /* LWJGL modules Banana OS has built: its jars, which carry the
          * checksums of its native libraries (ports/lwjgl/build.sh) */
         if (!strncmp(name, "org.lwjgl:", 10) && !cls[0] && mc_lwjgl_dir()) {
@@ -608,8 +631,18 @@ static int plan_make(plan_t* p, const char* id, char* err, int ecap) {
     const char* why = old_version(p->json);
     if (why) {
         if (v) ((mc_version*)v)->lwjgl2 = 1;
-        snprintf(err, (size_t)ecap, "%s %s: play 1.13 to 1.20.4", id, why);
+        snprintf(err, (size_t)ecap, "%s %s: play 1.7.2 to 1.20.4", id, why);
         return -1;
+    }
+    p->lwjgl2 = uses_lwjgl2(p->json);
+    if (p->lwjgl2) {
+        /* LWJGL 2's classes (lwjgl2.jar: its loader rewrites the game's
+         * calls as it loads them) and the LWJGL 3 they run on */
+        static const char* const l3[] = { "lwjgl2", "lwjgl", "lwjgl-opengl", "lwjgl-glfw", "lwjgl-openal", NULL };
+        for (int i = 0; l3[i]; i++) {
+            snprintf(path, sizeof(path), "%s/%s.jar", mc_lwjgl_dir(), l3[i]);
+            if (add_cp(p, path)) goto oom;
+        }
     }
     if (plan_libraries(p, err, ecap)) return -1;
     /* the game itself: last on the class path, like the official launcher */
@@ -972,6 +1005,12 @@ int mc_play(const char* id, const char* user, int ram_mb, char* err, int ecap) {
     sv_add(&r.jvm, strdup("-Dos.name=Linux"));
     /* jemalloc has no Banana OS build: LWJGL's malloc is the C library's */
     sv_add(&r.jvm, strdup("-Dorg.lwjgl.system.allocator=system"));
+    /* LWJGL 2 versions: lwjgl2.jar's class loader is the system one (it
+     * rewrites calls with the JDK's own ASM) */
+    if (p.lwjgl2) {
+        sv_add(&r.jvm, strdup("-Djava.system.class.loader=banana.lwjgl2.Loader"));
+        sv_add(&r.jvm, strdup("--add-exports=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED"));
+    }
     sv_add(&r.jvm, strdup("-Dsun.java.launcher=SUN_STANDARD"));
     snprintf(s, sizeof(s), "-Dsun.java.command=%s", main_class);             sv_add(&r.jvm, strdup(s));
     if (p.log_arg[0]) sv_add(&r.jvm, subst(p.log_arg, vars));

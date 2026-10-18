@@ -188,8 +188,8 @@ static void start(int play) {
     if (g_state == ST_BUSY || g_state == ST_RUNNING || g_state == ST_LOADING || sel < 0) return;
     const char* why = mc_unsupported(&mc_versions[shown[sel]]);
     if (play && why) {
-        snprintf(g_msg, sizeof(g_msg), "%s can't run on Banana OS (%s): play 1.13 to 1.20.4.", sel_id,
-                 !strcmp(why, "LWJGL 2") ? "it uses LWJGL 2" : why);
+        snprintf(g_msg, sizeof(g_msg), "%s can't run on Banana OS (%s): play 1.7.2 to 1.20.4.", sel_id,
+                 !strcmp(why, "LWJGL 2") ? "it uses LWJGL 2: update java.bpk" : !strcmp(why, "Java 8") ? "it needs Java 8" : why);
         g_state = ST_ERROR;
         return;
     }

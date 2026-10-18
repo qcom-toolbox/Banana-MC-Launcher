@@ -11,8 +11,14 @@ Java port; Microsoft sign-in comes later. Online servers will refuse offline pla
 ## What it does
 
 - Lists versions from Mojang's manifest (a copy is kept for when you're offline);
-  releases, plus snapshots if you tick the box. Versions that need Java 21
-  (1.20.5 and newer) are greyed out: Banana OS has Java 17, so **1.20.4 is the newest playable**.
+  releases, plus snapshots if you tick the box. **1.7.2 to 1.20.4 are playable.**
+  Versions that need Java 21 (1.20.5 and newer) are greyed out (Banana OS has
+  Java 17), and so are 1.6.4 and older (launchwrapper, made for Java 8).
+- 1.7.2 to 1.12.2 use LWJGL 2: they run on Banana OS's LWJGL 3 through
+  `/usr/java/lwjgl/lwjgl2.jar` (Banana-OS `ports/lwjgl/lwjgl2`: LWJGL 2's
+  `Display`, `Keyboard`, `Mouse`... and a class loader that rewrites the calls
+  LWJGL 3 names otherwise). The launcher swaps Minecraft's LWJGL 2 jars for it.
+  Checked: 1.8.9 on Banana OS (a world, moving, the inventory, sound).
 - Downloads like the official launcher, into `~/.minecraft`: `versions/`,
   `libraries/`, `assets/`. Six downloads at once, every file checked against its
   SHA-1, and anything already there with the right size is skipped.

@@ -17,7 +17,7 @@ typedef struct {
     char sha1[41];
     char time[32];                      /* releaseTime, ISO 8601 */
     int  java;                          /* Java it needs, if known (0: not known yet) */
-    int  lwjgl2;                        /* found to use LWJGL 2 / launchwrapper */
+    int  lwjgl2;                        /* found unplayable: launchwrapper, or LWJGL 2 without lwjgl2.jar */
 } mc_version;
 
 typedef struct {
@@ -39,7 +39,7 @@ int  mc_init(char* err, int ecap);
 int  mc_load_manifest(char* err, int ecap);
 /* by its guess from the release date: the Java a version needs (8, 16, 17, 21) */
 int  mc_java_guess(const mc_version* v);
-/* why Banana OS cannot play a version, as a short tag ("Java 21", "LWJGL 2"), or NULL */
+/* why Banana OS cannot play a version, as a short tag ("Java 21", "Java 8", "LWJGL 2"), or NULL */
 const char* mc_unsupported(const mc_version* v);
 
 /* the JDK: JAVA_HOME, /usr/java/jdk (the java package), /jdk, ... (NULL: none) */
