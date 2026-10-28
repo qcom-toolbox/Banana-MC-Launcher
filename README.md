@@ -57,8 +57,14 @@ The launcher finds them by itself:
   JDK (`/usr/java/lwjgl`), `/lwjgl`, `/mnt/<disk>/lwjgl`. Minecraft's own `lwjgl`, `lwjgl-opengl` and
   `lwjgl-glfw` jars are replaced by the ones there (they carry the checksums of
   Banana OS's native libraries), and the library path points there.
-- **OpenGL:** `libOSMesa.so` in `/usr/java/lib`, `/lib` or `/mnt/<disk>/lib`, or `lib/` beside the
-  JDK (passed on as `BGL3_LIBRARY`).
+- **OpenGL:** the system Mesa runtime first — `libOSMesa.so` in `/lib`, `/usr/lib`,
+  `/apps/mesa` or `/mnt/<disk>/lib` (the mesa package of the
+  **Banana_OS-mesa.iso** prereleases) — and only then `libOSMesa.so` beside the
+  JDK (`/usr/java/lib`, from java.bpk). The runtime one carries the GPU
+  drivers: **crocus and iris** for Intel (used when `gpu3d on` has opened
+  `/dev/dri/card0`) and **VirGL** in a VM; it falls back to softpipe itself.
+  java.bpk's copy has no drivers and draws on the processor. The one the game
+  got is in the log's header line, and `BGL3_LIBRARY` overrides the choice.
 
 It also starts the game with `-Dos.name=Linux` (LWJGL doesn't know "Banana OS")
 and `-Dorg.lwjgl.system.allocator=system` (no jemalloc build).
@@ -73,8 +79,10 @@ and `-Dorg.lwjgl.system.allocator=system` (no jemalloc build).
    the CI log says if it was left out.
 3. **The 64-bit Banana OS** (the Java port is 64-bit only). The `.bpk` contains
    a 32-bit build too, which says so.
-4. Speed: Java on Banana OS is the Zero interpreter (no JIT) and OpenGL is
-   Mesa's softpipe on the processor, so expect very low frame rates.
+4. Speed: Java on Banana OS is the Zero interpreter (no JIT). With an Intel GPU
+   (`gpu3d on`) and the mesa package installed, the game draws with Mesa's
+   crocus/iris; otherwise it is softpipe on the processor, so expect very low
+   frame rates.
 
 ## Build
 

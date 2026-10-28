@@ -351,6 +351,24 @@ const char* mc_lwjgl_dir(void) {
     return NULL;
 }
 
+/* Mesa's libOSMesa.so for the game's OpenGL 3.3: the system Mesa runtime (the
+ * mesa package of Banana_OS-mesa.iso: /lib/libOSMesa.so, a link to the one in
+ * /apps/mesa) before java.bpk's copy beside the JDK. The runtime has the GPU
+ * drivers in it - crocus and iris for Intel (they take /dev/dri/card0, which
+ * `gpu3d on` opens) and VirGL in a VM - and falls back to softpipe itself;
+ * java's copy draws on the processor only. (NULL: none found) */
+const char* mc_gl_library(void) {
+    static const char* const libs[] = { "/lib/libOSMesa.so", "/usr/lib/libOSMesa.so", "/apps/mesa/libOSMesa.so",
+                                        "/mnt/usb/lib/libOSMesa.so", "/mnt/virtio/lib/libOSMesa.so", "/mnt/sata/lib/libOSMesa.so",
+                                        "/mnt/nvme/lib/libOSMesa.so", NULL };
+    for (int i = 0; libs[i]; i++) if (file_size(libs[i]) > 0) return libs[i];
+    static char beside[300];
+    const char* jh = mc_java_home();
+    if (!jh) return NULL;
+    beside_jdk(jh, "lib/libOSMesa.so", beside, sizeof(beside));
+    return file_size(beside) > 0 ? beside : NULL;
+}
+
 void mc_preflight(char* out, int cap) {
     out[0] = 0;
     int n = 0;
@@ -374,6 +392,17 @@ void mc_preflight(char* out, int cap) {
     }
     if (!mc_lwjgl_dir())
         NOTE("No LWJGL for Banana OS (/usr/java/lwjgl, from java.bpk): the game stops when it opens its window.\n");
+    if (!getenv("BGL3_LIBRARY")) {                 /* (a set one wins: these notes are about the search) */
+        const char* gl = mc_gl_library();
+        if (!gl) {
+            NOTE("No OpenGL (libOSMesa.so) found: install java.bpk, or the mesa package of a Banana_OS-mesa.iso.\n");
+        } else if (jh) {
+            char beside[300];
+            beside_jdk(jh, "lib/libOSMesa.so", beside, sizeof(beside));
+            if (!strcmp(gl, beside))
+                NOTE("OpenGL is java.bpk's copy, which draws on the processor: the mesa package (Banana_OS-mesa.iso) adds the GPU drivers (Intel crocus/iris, VirGL); gpu3d on turns an Intel GPU on.\n");
+        }
+    }
 #undef NOTE
 }
 
@@ -948,11 +977,15 @@ int mc_play(const char* id, const char* user, int ram_mb, char* err, int ecap) {
      * itself loads from its folder (the -D options further down) */
     const char* lwjgl = mc_lwjgl_dir();
     snprintf(natives, sizeof(natives), "%s/natives", mc_root);
-    /* OpenGL 3.3 (Mesa's libOSMesa.so) beside the JDK: libglfw.so finds
-     * /lib and /mnt/<disk>/lib itself, BGL3_LIBRARY anywhere else */
-    char osmesa[300];
-    beside_jdk(jh, "lib/libOSMesa.so", osmesa, sizeof(osmesa));
-    if (!getenv("BGL3_LIBRARY") && file_size(osmesa) > 0) setenv("BGL3_LIBRARY", osmesa, 1);
+    /* OpenGL 3.3 (Mesa's libOSMesa.so): the system Mesa runtime first (the
+     * mesa package: /lib/libOSMesa.so) - it has the GPU drivers in it (crocus
+     * and iris for Intel, once `gpu3d on` opened /dev/dri/card0; VirGL in a
+     * VM) and falls back to softpipe itself - and java's own copy beside the
+     * JDK, which is softpipe only, after that. BGL3_LIBRARY, if set, wins */
+    if (!getenv("BGL3_LIBRARY")) {
+        const char* gl = mc_gl_library();
+        if (gl) setenv("BGL3_LIBRARY", gl, 1);
+    }
     snprintf(assets, sizeof(assets), "%s/assets", mc_root);
     snprintf(libdir, sizeof(libdir), "%s/libraries", mc_root);
     snprintf(resources, sizeof(resources), "%s/resources", mc_root);
@@ -1038,6 +1071,8 @@ int mc_play(const char* id, const char* user, int ram_mb, char* err, int ecap) {
     FILE* lf = fopen(g_log, "w");
     if (lf) {
         fprintf(lf, "Banana OS Minecraft launcher %s - %s as %s (offline), JDK %s\n", LAUNCHER_VER, id, user, jh);
+        const char* gl = getenv("BGL3_LIBRARY");
+        if (gl && gl[0]) fprintf(lf, "OpenGL: %s\n", gl);
         log_line(lf, "JVM options", &r.jvm);
         fprintf(lf, "main class: %s\n", r.main_class);
         log_line(lf, "game arguments", &r.game);

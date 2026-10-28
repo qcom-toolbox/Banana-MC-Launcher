@@ -46,6 +46,10 @@ const char* mc_unsupported(const mc_version* v);
 const char* mc_java_home(void);
 /* LWJGL for Banana OS: LWJGL_HOME, ~/.minecraft/natives, lwjgl/ beside the JDK (/usr/java/lwjgl), /mnt/<disk>/lwjgl (NULL: none) */
 const char* mc_lwjgl_dir(void);
+/* Mesa's libOSMesa.so for the game: the system Mesa runtime (/lib, the mesa
+ * package of Banana_OS-mesa.iso - its crocus/iris and VirGL drivers use the
+ * GPU when there is one) before java.bpk's softpipe-only copy (NULL: none) */
+const char* mc_gl_library(void);
 /* things that will stop the game, one per line (empty: none seen) */
 void mc_preflight(char* out, int cap);
 
