@@ -96,6 +96,10 @@ make BANANA_OS=/path/to/Banana-OS     # if it's somewhere else
 
 Install it on Banana OS: `pkg install mclauncher.bpk` (or double-click it in Files).
 
+CI does the same on every push: `.github/workflows/build-bpk.yml` checks out
+this repo and Banana OS, builds `mclauncher.bpk` and uploads it as an
+artifact; pushing a `v*` tag also attaches it to a GitHub release.
+
 ## Testing on Linux
 
 `test/` runs the launcher's logic (`src/mc.c`) on a normal Linux machine with a

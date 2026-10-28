@@ -1,0 +1,62 @@
+# Builds mclauncher.bpk (i686 + x86_64) with Banana OS's SDK, like
+# `make BANANA_OS=Banana-OS` on a Linux machine (README: Build).
+#
+# - push / pull request: the .bpk is uploaded as a build artifact
+# - pushing a v* tag: the .bpk is also attached to a GitHub release
+
+name: Build .bpk
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+    paths-ignore: [ '**.md', '.gitignore', '.gitattributes' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write                # (the release step on v* tags)
+
+jobs:
+  bpk:
+    name: mclauncher.bpk (i686 + x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the launcher
+        uses: actions/checkout@v4
+
+      - name: Check out Banana OS
+        uses: actions/checkout@v4
+        with:
+          repository: qcom-toolbox/Banana-OS
+          path: Banana-OS
+
+      - name: Install the build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc gcc-multilib binutils make python3
+
+      - name: Build
+        run: make BANANA_OS="$GITHUB_WORKSPACE/Banana-OS"
+
+      - name: Check the package
+        run: |
+          test -s mclauncher.bpk
+          echo "mclauncher.bpk: $(du -h mclauncher.bpk | cut -f1)"
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: mclauncher.bpk
+          path: mclauncher.bpk
+          if-no-files-found: error
+
+      - name: Attach to a release (v* tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release create "$tag" --title "Minecraft Launcher $tag" --generate-notes mclauncher.bpk \
+            || gh release upload "$tag" mclauncher.bpk --clobber
