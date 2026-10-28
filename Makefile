@@ -10,7 +10,7 @@ BANANA_OS   ?= ../Banana-OS
 
 APP         = mclauncher
 TITLE       = Minecraft Launcher
-VERSION     = 0.1
+VERSION     = 0.2
 TYPE        = gui
 DESCRIPTION = Download and play Minecraft (Java Edition) - offline accounts, for testing
 AUTHOR      = Banana OS community
