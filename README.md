@@ -97,8 +97,9 @@ make BANANA_OS=/path/to/Banana-OS     # if it's somewhere else
 Install it on Banana OS: `pkg install mclauncher.bpk` (or double-click it in Files).
 
 CI does the same on every push: `.github/workflows/build-bpk.yml` checks out
-this repo and Banana OS, builds `mclauncher.bpk` and uploads it as an
-artifact; pushing a `v*` tag also attaches it to a GitHub release.
+this repo and Banana OS and builds `mclauncher.bpk`. Every push to main also
+publishes it as a prerelease on GitHub (tagged `build-<number>`), and pushing
+a `v*` tag makes a full release.
 
 ## Testing on Linux
 
